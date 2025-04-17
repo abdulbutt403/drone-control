@@ -1,0 +1,934 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row =>
+                    row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                );
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drone-Based Rescue System Prototype</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@6.26.0/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Load Google Maps API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDyajRDpahuIbsFcKWOEpNM_Gpa6vFuI1E&libraries=places"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #2A2A2A; /* Adjusted dark gray to avoid black */
+    }
+    .container {
+      width: 390px; /* iPhone 14 width */
+      height: 844px; /* iPhone 14 height */
+      margin: 0 auto;
+      border: 2px solid #3A3A3A; /* Slightly lighter gray border */
+      border-radius: 16px;
+      overflow: hidden;
+      background-color: #2A2A2A; /* Adjusted dark gray */
+      position: relative;
+    }
+    .app-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      background-color: #2A2A2A;
+      padding: 20px;
+    }
+    .header {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff; /* White */
+      text-align: center;
+      margin-bottom: 20px;
+      margin-top: 10px;
+      position: relative;
+    }
+    .back-arrow {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .subheader {
+      font-size: 16px;
+      font-weight: 600;
+      color: #00ff85; /* Neon green */
+      margin-bottom: 10px;
+    }
+    .input {
+      width: 90%;
+      padding: 10px;
+      border: 1px solid #3A3A3A; /* Slightly lighter gray border */
+      border-radius: 8px;
+      margin-bottom: 20px;
+      background-color: #3A3A3A; /* Slightly lighter gray */
+      color: #fff; /* White text */
+    }
+    .button {
+      background: linear-gradient(to right, #00f7ff, #00ff85); /* Cyan-to-green gradient */
+      color: #fff; /* White text (changed from black) */
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .secondary-button {
+      color: #6B7280; /* Light gray */
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .card {
+      width: 90%;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      background-color: #3A3A3A; /* Slightly lighter gray */
+    }
+    .text-white {
+      color: #fff; /* White */
+    }
+    .text-gray {
+      color: #6B7280; /* Light gray */
+    }
+    .text-green {
+      color: #00ff85; /* Neon green */
+    }
+    .joystick {
+      width: 150px;
+      height: 150px;
+      background-color: #00ff85; /* Neon green */
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff; /* White */
+      font-size: 16px;
+      margin: 20px auto;
+    }
+    .progress-bar {
+      width: 90%;
+      background-color: #00ff85; /* Neon green */
+      color: #fff; /* White */
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .status-bar {
+      width: 90%;
+      background-color: #3A3A3A; /* Slightly lighter gray */
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .map-container {
+      width: 100%;
+      height: 300px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .video-placeholder {
+      width: 100%;
+      height: 200px;
+      background-color: #1A1A1A;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .play-pause {
+      background: #00ff85;
+      color: #000;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .play-pause:hover {
+      background: #00cc6a;
+    }
+    .play-pause-icon {
+      position: relative;
+      width: 24px;
+      height: 24px;
+    }
+    .play-pause-icon::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 0;
+      height: 0;
+      border-style: solid;
+    }
+    .play-pause-icon.play::before {
+      border-width: 12px 0 12px 20px;
+      border-color: transparent transparent transparent rgba(0, 255, 133, 1);
+      margin-left: 3px;
+    }
+    .play-pause-icon.pause::before {
+      width: 6px;
+      height: 20px;
+      background: rgba(0, 255, 133, 1);
+      border: none;
+      box-shadow: 10px 0 0 rgba(0, 255, 133, 1);
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      background-color: #00ff85; /* Neon green */
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 5px;
+    }
+    .nav-link {
+      color: #00ff85;
+      text-decoration: none;
+      cursor: pointer;
+      padding: 8px;
+      display: block;
+      text-align: center;
+      transition: opacity 0.2s;
+    }
+    .nav-link:hover {
+      opacity: 0.8;
+    }
+    .nav-links-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+      width: 100%;
+    }
+    .toggle {
+      appearance: none;
+      width: 40px;
+      height: 20px;
+      background: #6B7280; /* Light gray */
+      border-radius: 9999px;
+      position: relative;
+      cursor: pointer;
+    }
+    .toggle:checked {
+      background: #00ff85; /* Neon green */
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #fff; /* White */
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: 0.3s;
+    }
+    .toggle:checked::after {
+      left: 22px;
+    }
+    .dropdown {
+      background-color: #3A3A3A; /* Slightly lighter gray */
+      color: #fff; /* White */
+      padding: 5px;
+      border-radius: 8px;
+      border: 1px solid #6B7280; /* Light gray border */
+    }
+    .role-toggle-container {
+      background-color: #3A3A3A; /* Slightly lighter gray */
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      width: 390px;
+    }
+    .role-toggle {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #3A3A3A; /* Inactive background */
+      border-radius: 9999px;
+      padding: 4px;
+    }
+    .role-option {
+      padding: 8px 16px;
+      border-radius: 9999px;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .role-option.active {
+      background-color: #00ff85; /* Neon green for active */
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const { createRoot } = ReactDOM;
+
+    // Role Toggle Component
+    const RoleToggle = ({ role, setRole }) => {
+      const handleRoleChange = (newRole) => {
+        setRole(newRole);
+        navigateTo('login'); // Reset to login screen when role changes
+      };
+
+      return (
+        <div className="role-toggle-container">
+          <div className="flex justify-center">
+            <div className="text-green font-bold mr-4">Role:</div>
+            <div className="role-toggle">
+              <div
+                onClick={() => handleRoleChange('police')}
+                className={`role-option ${role === 'police' ? 'active' : ''}`}
+              >
+                Police
+              </div>
+              <div
+                onClick={() => handleRoleChange('hiker')}
+                className={`role-option ${role === 'hiker' ? 'active' : ''}`}
+              >
+                Hiker
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Google Map Component
+    const GoogleMap = ({ mapId, center }) => {
+      useEffect(() => {
+        const map = new google.maps.Map(document.getElementById(mapId), {
+          center: center,
+          zoom: 15,
+        });
+
+        new google.maps.Marker({
+          position: center,
+          map: map,
+          title: 'Drone Location',
+        });
+      }, [mapId, center]);
+
+      return <div id={mapId} className="map-container"></div>;
+    };
+
+    const App = () => {
+      const [role, setRole] = useState('police'); // Default role: police
+      const [currentScreen, setCurrentScreen] = useState('login'); // Default screen: login
+      const [previousScreen, setPreviousScreen] = useState('login'); // Track previous screen
+
+      // Navigation handler
+      const navigateTo = (screen) => {
+        setPreviousScreen(currentScreen);
+        setCurrentScreen(screen);
+      };
+
+      // Back navigation handler
+      const goBack = () => {
+        setCurrentScreen(previousScreen);
+      };
+
+      // Login Screen (Shared)
+      const LoginScreen = () => {
+        const [email, setEmail] = useState('');
+        const [password, setPassword] = useState('');
+
+        const handleLogin = () => {
+          // For prototype: Accept any credentials
+          if (role === 'police') {
+            navigateTo('droneControl');
+          } else {
+            navigateTo('sosRequest');
+          }
+        };
+
+        return (
+          <div className="flex flex-col items-center h-full p-4">
+            <h1 className="header">Login</h1>
+            <div className="card w-full flex flex-col items-center">
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input"
+              />
+              <div onClick={handleLogin} className="button w-3/4">
+                Login
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // Police Screens
+      const DroneControlScreen = () => (
+        <div className="flex flex-col items-center h-full p-4">
+          <h1 className="header">
+            <span className="back-arrow" onClick={goBack}>←</span>
+            Drone Control
+          </h1>
+          <div className="card w-full flex flex-col items-center">
+            <h2 className="subheader">Drone Status</h2>
+            <div className="progress-bar">
+              Battery: 75%
+            </div>
+            <div className="joystick">
+              Joystick
+            </div>
+            <div className="flex space-x-4 w-3/4">
+              <button
+              style={{width: "50%"}}
+                onClick={() => navigateTo('mapTracking')}
+                className="button flex-1"
+              >
+                Start Surveillance
+              </button>
+              <button
+              style={{width: "50%"}}
+                onClick={() => alert('Waypoint Set!')}
+                className="button flex-1"
+              >
+                Set Waypoint
+              </button>
+            </div>
+            <div className="nav-links-container">
+              <div onClick={() => navigateTo('mapTracking')} className="nav-link">
+                Map Tracking
+              </div>
+              <div onClick={() => navigateTo('liveVideoFeed')} className="nav-link">
+                Live Video Feed
+              </div>
+              <div onClick={() => navigateTo('alertNotifications')} className="nav-link">
+                Alert Notifications
+              </div>
+              <div onClick={() => navigateTo('missionHistory')} className="nav-link">
+                Mission History
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+      const MapTrackingScreen = () => (
+        <div className="flex flex-col items-center h-full p-4">
+          <h1 className="header">
+            <span className="back-arrow" onClick={goBack}>←</span>
+            Map Tracking
+          </h1>
+          <div className="card w-full flex flex-col items-center">
+            <h2 className="subheader">Drone Location</h2>
+            <GoogleMap mapId="map-tracking" center={{ lat: 25.1234, lng: 55.5678 }} />
+            <button
+              onClick={() => alert('Area Marked!')}
+              className="button w-3/4"
+            >
+              Mark Area
+            </button>
+            <div className="nav-links-container">
+              <div onClick={() => navigateTo('droneControl')} className="nav-link">
+                Drone Control
+              </div>
+              <div onClick={() => navigateTo('liveVideoFeed')} className="nav-link">
+                Live Video Feed
+              </div>
+              <div onClick={() => navigateTo('alertNotifications')} className="nav-link">
+                Alert Notifications
+              </div>
+              <div onClick={() => navigateTo('missionHistory')} className="nav-link">
+                Mission History
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+      const LiveVideoFeedScreen = () => {
+        const [isPlaying, setIsPlaying] = useState(false);
+
+        return (
+          <div className="flex flex-col items-center h-full p-4">
+            <h1 className="header">
+              <span className="back-arrow" onClick={goBack}>←</span>
+              Live Video Feed
+            </h1>
+            <div className="card w-full flex flex-col items-center">
+              <h2 className="subheader">Drone Camera</h2>
+              <div className="video-placeholder">
+                <button
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className="play-pause"
+                >
+                  {isPlaying ? 'Pause' : 'Play'}
+                </button>
+              </div>
+              <div className="status-bar">
+                <div className="flex items-center mb-2">
+                  <span className="text-green mr-2">🚁</span>
+                  <p className="text-white">Drone ID: DRN-001</p>
+                </div>
+                <div className="flex items-center mb-2">
+                  <span className="text-green mr-2">📍</span>
+                  <p className="text-white">Location: Mountain Ridge, Sector 5</p>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-green mr-2">📡</span>
+                  <p className="text-white">Signal Strength: 85%</p>
+                </div>
+              </div>
+              <div className="flex space-x-4 w-3/4">
+                <button
+                  onClick={() => alert('Recording Started')}
+                  className="button flex-1"
+                >
+                  Record
+                </button>
+                <button
+                  onClick={() => alert('Snapshot Taken')}
+                  className="button flex-1"
+                >
+                  Snapshot
+                </button>
+              </div>
+              <div className="nav-links-container">
+                <div onClick={() => navigateTo('droneControl')} className="nav-link">
+                  Drone Control
+                </div>
+                <div onClick={() => navigateTo('mapTracking')} className="nav-link">
+                  Map Tracking
+                </div>
+                <div onClick={() => navigateTo('alertNotifications')} className="nav-link">
+                  Alert Notifications
+                </div>
+                <div onClick={() => navigateTo('missionHistory')} className="nav-link">
+                  Mission History
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const AlertNotificationsScreen = () => (
+        <div className="flex flex-col items-center h-full p-4">
+          <h1 className="header">
+            <span className="back-arrow" onClick={goBack}>←</span>
+            Alerts
+          </h1>
+          <div className="card w-full">
+            <h2 className="subheader">Recent Alerts</h2>
+            <div className="flex items-center mb-2">
+              <span className="text-green mr-2">👤</span>
+              <p className="text-white">Hiker Detected at [25.1234, 55.5678]</p>
+            </div>
+            <div className="flex items-center">
+              <span className="text-green mr-2">📏</span>
+              <p className="text-white">Distance: 50 meters</p>
+            </div>
+          </div>
+          <div className="flex space-x-4 w-3/4">
+            <button
+              onClick={() => navigateTo('mapTracking')}
+              className="button flex-1"
+            >
+              View on Map
+            </button>
+            <button
+              onClick={() => alert('Alert Dismissed')}
+              className="button flex-1"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="nav-links-container">
+            <div onClick={() => navigateTo('droneControl')} className="nav-link">
+              Drone Control
+            </div>
+            <div onClick={() => navigateTo('mapTracking')} className="nav-link">
+              Map Tracking
+            </div>
+            <div onClick={() => navigateTo('liveVideoFeed')} className="nav-link">
+              Live Video Feed
+            </div>
+            <div onClick={() => navigateTo('missionHistory')} className="nav-link">
+              Mission History
+            </div>
+          </div>
+        </div>
+      );
+
+      const MissionHistoryScreen = () => (
+        <div className="flex flex-col items-center h-full p-4">
+          <h1 className="header">
+            <span className="back-arrow" onClick={goBack}>←</span>
+            Mission History
+          </h1>
+          <div className="card w-full">
+            <h2 className="subheader">Past Missions</h2>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-white">Mission #1: 2025-04-17</p>
+                <p className="text-gray text-sm">Status: Success</p>
+              </div>
+              <div
+                onClick={() => alert('Mission #1: Hiker rescued')}
+                className="secondary-button"
+              >
+                Details
+              </div>
+            </div>
+          </div>
+          <div className="nav-links-container">
+            <div onClick={() => navigateTo('droneControl')} className="nav-link">
+              Drone Control
+            </div>
+            <div onClick={() => navigateTo('mapTracking')} className="nav-link">
+              Map Tracking
+            </div>
+            <div onClick={() => navigateTo('liveVideoFeed')} className="nav-link">
+              Live Video Feed
+            </div>
+            <div onClick={() => navigateTo('alertNotifications')} className="nav-link">
+              Alert Notifications
+            </div>
+          </div>
+        </div>
+      );
+
+      // Hiker Screens
+      const SOSRequestScreen = () => {
+        const [isSent, setIsSent] = useState(false);
+        const [emergencyText, setEmergencyText] = useState('');
+
+        const handleSendSOS = () => {
+          if (emergencyText.trim()) {
+            setIsSent(true);
+            setTimeout(() => {
+              navigateTo('liveDroneUpdates');
+            }, 2000);
+          }
+        };
+
+        return (
+          <div className="flex flex-col items-center h-full p-4">
+            <h1 className="header">
+              <span className="back-arrow" onClick={goBack}>←</span>
+              Emergency SOS
+            </h1>
+            <div className="card w-full flex flex-col items-center">
+              <h2 className="subheader">Send Emergency Request</h2>
+              <textarea
+                placeholder="Describe your emergency"
+                className="input h-40"
+                value={emergencyText}
+                onChange={(e) => setEmergencyText(e.target.value)}
+              />
+              <div
+                onClick={handleSendSOS}
+                className="button w-3/4"
+              >
+                Send SOS
+              </div>
+              {isSent && (
+                <div className="flex items-center mt-4">
+                  <span className="status-dot"></span>
+                  <p className="text-green">Request Sent</p>
+                </div>
+              )}
+              <div className="nav-links-container">
+                <div onClick={() => navigateTo('profile')} className="nav-link">
+                  Go to Profile
+                </div>
+                <div onClick={() => navigateTo('emergencyContacts')} className="nav-link">
+                  Go to Emergency Contacts
+                </div>
+                <div onClick={() => navigateTo('liveDroneUpdates')} className="nav-link">
+                  Live drone updates
+                </div>
+                <div onClick={() => navigateTo('safetyTips')} className="nav-link">
+                  View Safety Tips
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const LiveDroneUpdatesScreen = () => (
+        <div className="flex flex-col items-center h-full p-4">
+          <h1 className="header">
+            <span className="back-arrow" onClick={goBack}>←</span>
+            Drone Updates
+          </h1>
+          <div className="card w-full flex flex-col items-center">
+            <h2 className="subheader">Drone Status</h2>
+            <GoogleMap mapId="drone-updates-map" center={{ lat: 25.1234, lng: 55.5678 }} />
+            <div className="video-placeholder">
+              <button
+                onClick={() => alert('Toggling Play/Pause')}
+                className="play-pause"
+              >
+                Play/Pause
+              </button>
+            </div>
+            <div className="nav-links-container">
+              <div onClick={() => navigateTo('emergencyContacts')} className="nav-link">
+                Go to Emergency Contacts
+              </div>
+              <div onClick={() => navigateTo('sosRequest')} className="nav-link">
+                Back to SOS
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+      const ProfileScreen = () => {
+        const [showSaveMessage, setShowSaveMessage] = useState(false);
+        const [email, setEmail] = useState('hiker@example.com');
+        const [emergencyAlerts, setEmergencyAlerts] = useState(true);
+        const [droneUpdates, setDroneUpdates] = useState(true);
+
+        const handleSave = () => {
+          setShowSaveMessage(true);
+          // In a real app, you would save to a server here
+          setTimeout(() => {
+            setShowSaveMessage(false);
+          }, 2000);
+        };
+
+        return (
+          <div className="flex flex-col items-center h-full p-4">
+            <h1 className="header">
+              <span className="back-arrow" onClick={goBack}>←</span>
+              Profile
+            </h1>
+            <div className="card w-full">
+              <h2 className="subheader">Account Settings</h2>
+              <div className="flex items-center mb-2">
+                <span className="text-green mr-2">📧</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input mb-0 flex-1 mr-2"
+                />
+              </div>
+              <div className="flex items-center">
+                <span className="text-green mr-2">👤</span>
+                <p className="text-white flex-1">Role: {role}</p>
+              </div>
+            </div>
+            <div className="card w-full">
+              <h2 className="subheader">Notification Preferences</h2>
+              <div className="flex items-center mb-2">
+                <span className="text-green mr-2">🔔</span>
+                <p className="text-white flex-1">Emergency Alerts</p>
+                <input
+                  type="checkbox"
+                  className="toggle"
+                  checked={emergencyAlerts}
+                  onChange={(e) => setEmergencyAlerts(e.target.checked)}
+                />
+              </div>
+              <div className="flex items-center">
+                <span className="text-green mr-2">🔔</span>
+                <p className="text-white flex-1">Drone Status Updates</p>
+                <input
+                  type="checkbox"
+                  className="toggle"
+                  checked={droneUpdates}
+                  onChange={(e) => setDroneUpdates(e.target.checked)}
+                />
+              </div>
+            </div>
+            <div
+              onClick={handleSave}
+              className="button w-3/4 mb-4"
+            >
+              Save Changes
+            </div>
+            {showSaveMessage && (
+              <div className="text-green mb-4 flex items-center">
+                <span className="status-dot mr-2"></span>
+                Changes saved successfully!
+              </div>
+            )}
+            <div
+              onClick={() => navigateTo('login')}
+              className="button w-3/4"
+            >
+              Logout
+            </div>
+            <div
+              onClick={() => navigateTo('sosRequest')}
+              className="nav-link"
+            >
+              Back to SOS Request
+            </div>
+          </div>
+        );
+      };
+
+      const EmergencyContactsScreen = () => (
+        <div className="flex flex-col items-center h-full p-4">
+          <h1 className="header">
+            <span className="back-arrow" onClick={goBack}>←</span>
+            Emergency Contacts
+          </h1>
+          <div className="card w-full">
+            <h2 className="subheader">Contacts</h2>
+            <div className="flex items-center">
+              <span className="text-green mr-2">📞</span>
+              <p className="text-white flex-1">John Doe: +1234567890</p>
+            </div>
+          </div>
+          <div
+            onClick={() => alert('Adding Contact')}
+            className="button w-3/4 mb-4"
+          >
+            Add Contact
+          </div>
+          <div onClick={() => navigateTo('safetyTips')} className="nav-link">
+            Go to Safety Tips
+          </div>
+        </div>
+      );
+
+      const SafetyTipsScreen = () => (
+        <div className="flex flex-col items-center h-full p-4">
+          <h1 className="header">
+            <span className="back-arrow" onClick={goBack}>←</span>
+            Safety Tips
+          </h1>
+          <div className="card w-full">
+            <h2 className="subheader">Tips</h2>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-white">Stay in an open area</p>
+                <p className="text-gray text-sm">Stay visible to drones</p>
+              </div>
+              <div
+                onClick={() => alert('Stay visible to drones by avoiding dense forests')}
+                className="secondary-button"
+              >
+                Read More
+              </div>
+            </div>
+          </div>
+          <div
+            onClick={() => navigateTo('emergencyContacts')}
+            className="nav-link"
+          >
+            Back to Emergency Contacts
+          </div>
+        </div>
+      );
+
+      // Render the appropriate screen based on role and currentScreen
+      const renderScreen = () => {
+        if (currentScreen === 'login') {
+          return <LoginScreen />;
+        }
+
+        if (role === 'police') {
+          switch (currentScreen) {
+            case 'droneControl':
+              return <DroneControlScreen />;
+            case 'mapTracking':
+              return <MapTrackingScreen />;
+            case 'liveVideoFeed':
+              return <LiveVideoFeedScreen />;
+            case 'alertNotifications':
+              return <AlertNotificationsScreen />;
+            case 'missionHistory':
+              return <MissionHistoryScreen />;
+            default:
+              return <DroneControlScreen />;
+          }
+        } else {
+          switch (currentScreen) {
+            case 'sosRequest':
+              return <SOSRequestScreen />;
+            case 'liveDroneUpdates':
+              return <LiveDroneUpdatesScreen />;
+            case 'profile':
+              return <ProfileScreen />;
+            case 'emergencyContacts':
+              return <EmergencyContactsScreen />;
+            case 'safetyTips':
+              return <SafetyTipsScreen />;
+            default:
+              return <SOSRequestScreen />;
+          }
+        }
+      };
+
+      return (
+        <div className="app-wrapper">
+          <RoleToggle role={role} setRole={setRole} />
+          <div className="container">
+            {/* Render Screens */}
+            {renderScreen()}
+          </div>
+        </div>
+      );
+    };
+
+    // Use createRoot instead of ReactDOM.render
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
